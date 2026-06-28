@@ -31,6 +31,7 @@ class HiveState:
     notes: str = ""
     mite_rate: Optional[float] = None
     mite_pressure: str = ""
+    mite_trend: str = ""          # "↑ Rising", "↓ Falling", "→ Stable", or ""
     mite_sample_date: Optional[date] = None
     treatment_status: str = ""
     treatment_type: str = ""
@@ -74,6 +75,18 @@ def classify_mite_rate(rate: float) -> str:
     return "Critical"
 
 
+def _is_blank(val: str) -> bool:
+    return val.lower() in ("", "nan", "none", "<na>", "n/a", "na")
+
+
+def _is_yes(val: str) -> bool:
+    return val.lower() in ("yes", "y", "true", "1")
+
+
+def _is_no(val: str) -> bool:
+    return val.lower() in ("no", "n", "false", "0")
+
+
 # ---------------------------------------------------------------------------
 # Per-hive lookups against DataFrames
 # ---------------------------------------------------------------------------
@@ -92,31 +105,40 @@ def days_since_inspection(hive_id: str, inspections: pd.DataFrame) -> tuple[Opti
 def get_queen_status(hive_id: str, inspections: pd.DataFrame) -> dict:
     rows = inspections[inspections["Hive"] == hive_id].dropna(subset=["Date"])
     if rows.empty:
-        return {"queen_seen": "", "eggs": "", "larvae": "", "queen_cells": "", "status": "Unknown", "is_queenless": False}
+        return {
+            "queen_seen": "", "eggs": "", "larvae": "", "queen_cells": "",
+            "status": "No inspections", "is_queenless": False,
+        }
     latest = rows.sort_values("Date").iloc[-1]
 
     queen_seen = str(latest.get("Queen Seen", "")).strip()
-    eggs = str(latest.get("Eggs", "")).strip()
-    larvae = str(latest.get("Larvae", "")).strip()
-    cells = str(latest.get("Queen Cells", "")).strip()
+    eggs       = str(latest.get("Eggs", "")).strip()
+    larvae     = str(latest.get("Larvae", "")).strip()
+    cells      = str(latest.get("Queen Cells", "")).strip()
 
-    is_queenless = (
-        queen_seen.lower() == "no"
-        and eggs.lower() == "no"
-        and larvae.lower() == "no"
-        and cells.lower() in ("no", "none", "")
-    )
-
-    if is_queenless:
+    # All queen fields blank → inspector didn't fill in the queen section
+    all_blank = all(_is_blank(v) for v in (queen_seen, eggs, larvae, cells))
+    if all_blank:
+        status = "Not recorded"
+        is_queenless = False
+    elif _is_no(queen_seen) and _is_no(eggs) and _is_no(larvae) and _is_blank(cells):
         status = "Queenless"
-    elif queen_seen.lower() == "yes":
+        is_queenless = True
+    elif _is_yes(queen_seen):
         status = "Queen Present"
-    elif eggs.lower() == "yes":
-        status = "Eggs Only"
-    elif cells.lower() not in ("no", "none", "", "nan"):
+        is_queenless = False
+    elif _is_yes(eggs):
+        status = "Eggs Present"
+        is_queenless = False
+    elif not _is_blank(cells) and not _is_no(cells):
         status = "Queen Cells"
+        is_queenless = False
+    elif _is_no(queen_seen) and _is_no(eggs):
+        status = "Queen Not Seen"
+        is_queenless = False
     else:
         status = "Unknown"
+        is_queenless = False
 
     return {
         "queen_seen": queen_seen,
@@ -131,19 +153,39 @@ def get_queen_status(hive_id: str, inspections: pd.DataFrame) -> dict:
 def get_mite_pressure(hive_id: str, mites: pd.DataFrame) -> dict:
     rows = mites[mites["Hive ID"] == hive_id].dropna(subset=["Sample Date"])
     if rows.empty:
-        return {"rate": None, "pressure": "Unknown", "sample_date": None, "treatment_status": "", "treatment_type": ""}
-    latest = rows.sort_values("Sample Date").iloc[-1]
+        return {
+            "rate": None, "pressure": "Unknown", "trend": "",
+            "sample_date": None, "treatment_status": "", "treatment_type": "",
+        }
+    sorted_rows = rows.sort_values("Sample Date")
+    latest = sorted_rows.iloc[-1]
 
-    rate_val = latest.get("Mites / 100 Bees")
-    try:
-        rate = float(rate_val)
-    except (ValueError, TypeError):
-        rate = None
+    def _rate(row) -> Optional[float]:
+        try:
+            return float(row.get("Mites / 100 Bees"))
+        except (ValueError, TypeError):
+            return None
 
+    rate = _rate(latest)
     pressure = classify_mite_rate(rate) if rate is not None else "Unknown"
+
+    # Trend: compare last two readings
+    trend = ""
+    if len(sorted_rows) >= 2:
+        prev_rate = _rate(sorted_rows.iloc[-2])
+        if rate is not None and prev_rate is not None:
+            diff = rate - prev_rate
+            if diff > 0.2:
+                trend = "↑ Rising"
+            elif diff < -0.2:
+                trend = "↓ Falling"
+            else:
+                trend = "→ Stable"
+
     return {
         "rate": rate,
         "pressure": pressure,
+        "trend": trend,
         "sample_date": latest.get("Sample Date"),
         "treatment_status": str(latest.get("Treatment Status", "")).strip(),
         "treatment_type": str(latest.get("Treatment Type", "")).strip(),
@@ -218,6 +260,8 @@ def calculate_risk_score(hs: HiveState) -> int:
         score += 20
     elif hs.mite_pressure == "Critical":
         score += 35
+    if hs.mite_trend == "↑ Rising":
+        score += 5
     if hs.treatment_status.lower() in ("treat now", "due"):
         score += 25
     if hs.is_overdue:
@@ -237,12 +281,16 @@ def get_alerts(hs: HiveState) -> list[str]:
         alerts.append("OVERDUE — inspection needed")
     if hs.is_queenless:
         alerts.append("QUEENLESS")
-    if hs.eggs.lower() == "no" and not hs.is_queenless:
+    if hs.queen_status == "Queen Not Seen" and not hs.is_queenless:
+        alerts.append("Queen not seen")
+    if _is_no(hs.eggs) and hs.queen_status not in ("Not recorded", "Queenless"):
         alerts.append("No eggs seen")
-    if hs.queen_cells.lower() not in ("no", "none", "", "nan"):
+    if not _is_blank(hs.queen_cells) and not _is_no(hs.queen_cells):
         alerts.append(f"Queen cells: {hs.queen_cells}")
     if hs.mite_pressure in ("High", "Critical"):
         alerts.append(f"Mite pressure {hs.mite_pressure}")
+    if hs.mite_trend == "↑ Rising" and hs.mite_pressure in ("Moderate", "High", "Critical"):
+        alerts.append("Mite rate rising")
     if hs.treatment_status.lower() in ("treat now", "due"):
         alerts.append("Mite treatment due")
     return alerts
@@ -272,24 +320,24 @@ def get_active_hives(lists_df: pd.DataFrame) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def build_apiary_state(tables: dict) -> list[HiveState]:
-    inspections = tables["inspections"]
-    mites = tables["mites"]
+    inspections    = tables["inspections"]
+    mites          = tables["mites"]
     larvae_calendar = tables["larvae_calendar"]
-    honey_harvest = tables["honey_harvest"]
-    mating_nucs = tables["mating_nucs"]
-    lists_df = tables["lists"]
+    honey_harvest  = tables["honey_harvest"]
+    mating_nucs    = tables["mating_nucs"]
+    lists_df       = tables["lists"]
 
     active_hives = get_active_hives(lists_df)
     states = []
 
     for hive_id in active_hives:
         days, last_date = days_since_inspection(hive_id, inspections)
-        queen_info = get_queen_status(hive_id, inspections)
-        mite_info = get_mite_pressure(hive_id, mites)
+        queen_info  = get_queen_status(hive_id, inspections)
+        mite_info   = get_mite_pressure(hive_id, mites)
         larvae_info = get_larvae_activity(hive_id, larvae_calendar)
         next_action = get_next_action(hive_id, inspections, larvae_calendar)
-        honey_ytd = get_honey_ytd(hive_id, honey_harvest)
-        nuc_status = get_mating_nuc_status(hive_id, mating_nucs)
+        honey_ytd   = get_honey_ytd(hive_id, honey_harvest)
+        nuc_status  = get_mating_nuc_status(hive_id, mating_nucs)
 
         bee_frames = None
         food_stores = ""
@@ -304,7 +352,7 @@ def build_apiary_state(tables: dict) -> list[HiveState]:
                 bee_frames = None
             food_stores = str(latest.get("Food Stores", "")).strip()
             temperament = str(latest.get("Temperament", "")).strip()
-            notes = str(latest.get("Notes", "")).strip()
+            notes       = str(latest.get("Notes", "")).strip()
 
         is_overdue = days is not None and days > 14
 
@@ -325,6 +373,7 @@ def build_apiary_state(tables: dict) -> list[HiveState]:
             notes=notes,
             mite_rate=mite_info["rate"],
             mite_pressure=mite_info["pressure"],
+            mite_trend=mite_info["trend"],
             mite_sample_date=mite_info["sample_date"],
             treatment_status=mite_info["treatment_status"],
             treatment_type=mite_info["treatment_type"],

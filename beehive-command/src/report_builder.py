@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 from .analysis import HiveState
 
 _TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+_REPORTS_DIR   = Path(__file__).parent.parent / "reports"
 
 
 def _active_batch_rows(tables: dict) -> list[dict]:
@@ -48,23 +49,31 @@ def build_report(
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=False)
     template = env.get_template("report.html.j2")
 
-    honey_rows = [h for h in apiary_state if h.honey_ytd_lbs > 0]
+    honey_rows  = [h for h in apiary_state if h.honey_ytd_lbs > 0]
     honey_total = sum(h.honey_ytd_lbs for h in apiary_state)
 
     context = {
-        "apiary_name": config.apiary_name,
-        "report_date": datetime.now().strftime("%B %d, %Y"),
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "excel_path": f"https://docs.google.com/spreadsheets/d/{config.spreadsheet_id}",
-        "hive_states": apiary_state,
+        "apiary_name":      config.apiary_name,
+        "report_date":      datetime.now().strftime("%B %d, %Y"),
+        "generated_at":     datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "spreadsheet_url":  f"https://docs.google.com/spreadsheets/d/{config.spreadsheet_id}",
+        "hive_states":      apiary_state,
         "active_hive_count": len(apiary_state),
         "total_bee_frames": sum(h.bee_frames or 0 for h in apiary_state),
-        "alert_count": sum(1 for h in apiary_state if h.alerts),
-        "seasonal_advice": seasonal_advice,
-        "honey_rows": honey_rows,
-        "honey_total": honey_total,
-        "active_batches": _active_batch_rows(tables),
-        "active_larvae": _active_larvae_rows(tables),
+        "alert_count":      sum(1 for h in apiary_state if h.alerts),
+        "seasonal_advice":  seasonal_advice,
+        "honey_rows":       honey_rows,
+        "honey_total":      honey_total,
+        "active_batches":   _active_batch_rows(tables),
+        "active_larvae":    _active_larvae_rows(tables),
         "active_mating_nucs": [h for h in apiary_state if h.mating_nuc_status],
     }
     return template.render(**context)
+
+
+def save_report(html: str) -> Path:
+    """Save the HTML report to reports/YYYY-MM-DD.html and return the path."""
+    _REPORTS_DIR.mkdir(exist_ok=True)
+    path = _REPORTS_DIR / f"{date.today().isoformat()}.html"
+    path.write_text(html, encoding="utf-8")
+    return path

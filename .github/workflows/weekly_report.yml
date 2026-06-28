@@ -1,0 +1,44 @@
+name: Weekly Apiary Report
+
+on:
+  schedule:
+    # Every Sunday at 8:00 AM Eastern (12:00 UTC during EDT, 13:00 UTC during EST)
+    # Runs at 12:00 UTC — adjust to 13:00 in winter if desired
+    - cron: '0 12 * * 0'
+  workflow_dispatch:   # allows manual trigger from GitHub Actions tab
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r beehive-command/requirements.txt
+
+      - name: Write service account JSON
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON_B64 }}" | base64 --decode > /tmp/service-account.json
+
+      - name: Write .env file
+        run: |
+          cat > beehive-command/.env << EOF
+          SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}
+          SERVICE_ACCOUNT_JSON=/tmp/service-account.json
+          APIARY_NAME=Turin Family Farm Apiary
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          EMAIL_TO=${{ secrets.EMAIL_TO }}
+          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+          EOF
+
+      - name: Generate and send report
+        run: |
+          cd beehive-command
+          python main.py

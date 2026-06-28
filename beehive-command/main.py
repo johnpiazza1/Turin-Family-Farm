@@ -9,6 +9,7 @@ import argparse
 import sys
 import tempfile
 import webbrowser
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -17,7 +18,7 @@ from config import load_config
 from src.ingest import load_workbook
 from src.analysis import build_apiary_state
 from src.seasonal import get_seasonal_advice
-from src.report_builder import build_report
+from src.report_builder import build_report, save_report
 from src.email_sender import send_report
 
 
@@ -38,11 +39,15 @@ def main() -> None:
     seasonal_advice = get_seasonal_advice(apiary_state)
     html = build_report(apiary_state, tables, seasonal_advice, config)
 
+    # Always archive the report
+    archive_path = save_report(html)
+    print(f"Report archived: {archive_path}")
+
     if args.dry_run:
         with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
             f.write(html)
             tmp_path = f.name
-        print(f"Report written to {tmp_path}")
+        print(f"Report opened in browser: {tmp_path}")
         webbrowser.open(f"file://{tmp_path}")
         return
 

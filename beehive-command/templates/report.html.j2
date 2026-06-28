@@ -214,6 +214,7 @@
           <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Hive</th>
           <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Sample Date</th>
           <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Mites/100</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Trend</th>
           <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Pressure</th>
           <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Treatment</th>
           <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Status</th>
@@ -226,6 +227,10 @@
           </td>
           <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">
             {% if h.mite_rate is not none %}{{ "%.1f"|format(h.mite_rate) }}{% else %}—{% endif %}
+          </td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;
+            color:{% if h.mite_trend == '↑ Rising' %}#c0392b{% elif h.mite_trend == '↓ Falling' %}#155724{% else %}#555{% endif %};">
+            {{ h.mite_trend or '—' }}
           </td>
           <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">
             <span style="font-weight:bold;
@@ -289,7 +294,7 @@
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#5a3e1b;">
   <tr>
     <td style="padding:16px 32px;color:#c9a96e;font-size:11px;">
-      Generated {{ generated_at }} &nbsp;|&nbsp; Data: {{ excel_path }}
+      Generated {{ generated_at }} &nbsp;|&nbsp; <a href="{{ spreadsheet_url }}" style="color:#f5d78e;">Open Google Sheet</a>
     </td>
   </tr>
 </table>
