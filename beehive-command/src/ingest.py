@@ -42,7 +42,14 @@ def xl_date(val) -> date | None:
     Google Sheets returns dates as floats when UNFORMATTED_VALUE is used,
     matching the Excel serial format (epoch = 1899-12-30).
     """
-    if val is None or val == "":
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if val == "":
         return None
     if hasattr(val, "date"):
         try:
@@ -51,12 +58,7 @@ def xl_date(val) -> date | None:
             return None
     if isinstance(val, date):
         return val
-    try:
-        if pd.isna(val):
-            return None
-    except (TypeError, ValueError):
-        pass
-    if isinstance(val, (int, float)) and val > 0:
+    if isinstance(val, (int, float)) and float(val) > 0:
         return EXCEL_EPOCH + timedelta(days=int(val))
     return None
 

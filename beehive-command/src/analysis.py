@@ -253,19 +253,15 @@ def get_alerts(hs: HiveState) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def get_active_hives(lists_df: pd.DataFrame) -> list[str]:
-    """Return hive IDs from col T (HiveIDList) that have an active status in col W."""
-    cols = lists_df.columns.tolist()
-    if len(cols) < 23:
+    """Return hive IDs from the HiveID column where Status == Active."""
+    if "HiveID" not in lists_df.columns:
         return []
-    hive_col = cols[19]   # column T (0-indexed: 19)
-    status_col = cols[22] if len(cols) > 22 else None
 
-    hives = lists_df[hive_col].astype(str).str.strip()
-    hives = hives[hives.str.len() > 0]
-    hives = hives[hives != "nan"]
+    hives = lists_df["HiveID"].astype(str).str.strip()
+    hives = hives[(hives.str.len() > 0) & (hives != "nan")]
 
-    if status_col:
-        statuses = lists_df[status_col].astype(str).str.strip().str.lower()
+    if "Status" in lists_df.columns:
+        statuses = lists_df["Status"].astype(str).str.strip().str.lower()
         hives = hives[statuses == "active"]
 
     return hives.tolist()
