@@ -55,7 +55,7 @@ def build_report(
         "apiary_name": config.apiary_name,
         "report_date": datetime.now().strftime("%B %d, %Y"),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "excel_path": config.excel_path,
+        "excel_path": f"https://docs.google.com/spreadsheets/d/{config.spreadsheet_id}",
         "hive_states": apiary_state,
         "active_hive_count": len(apiary_state),
         "total_bee_frames": sum(h.bee_frames or 0 for h in apiary_state),
