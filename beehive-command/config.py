@@ -9,7 +9,8 @@ load_dotenv()
 
 @dataclass
 class Config:
-    excel_path: str
+    spreadsheet_id: str
+    service_account_json: str
     apiary_name: str
     email_from: str
     email_to: str
@@ -18,7 +19,7 @@ class Config:
 
 def load_config() -> Config:
     missing = []
-    required = ["EXCEL_PATH", "EMAIL_FROM", "EMAIL_TO", "GMAIL_APP_PASSWORD"]
+    required = ["SPREADSHEET_ID", "SERVICE_ACCOUNT_JSON", "EMAIL_FROM", "EMAIL_TO", "GMAIL_APP_PASSWORD"]
     for key in required:
         if not os.getenv(key):
             missing.append(key)
@@ -28,12 +29,16 @@ def load_config() -> Config:
             "Copy .env.example to .env and fill in the values."
         )
 
-    path = os.environ["EXCEL_PATH"]
-    if not Path(path).exists():
-        raise FileNotFoundError(f"Excel file not found: {path}")
+    sa_path = os.environ["SERVICE_ACCOUNT_JSON"]
+    if not Path(sa_path).exists():
+        raise FileNotFoundError(
+            f"Service account JSON not found: {sa_path}\n"
+            "See README for how to create a GCP service account."
+        )
 
     return Config(
-        excel_path=path,
+        spreadsheet_id=os.environ["SPREADSHEET_ID"],
+        service_account_json=sa_path,
         apiary_name=os.getenv("APIARY_NAME", "Apiary"),
         email_from=os.environ["EMAIL_FROM"],
         email_to=os.environ["EMAIL_TO"],

@@ -28,8 +28,8 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config()
-    print(f"Loading workbook: {config.excel_path}")
-    tables = load_workbook(config.excel_path)
+    print(f"Loading spreadsheet: {config.spreadsheet_id}")
+    tables = load_workbook(config.spreadsheet_id, config.service_account_json)
 
     print("Building apiary state...")
     apiary_state = build_apiary_state(tables)
@@ -46,16 +46,11 @@ def main() -> None:
         webbrowser.open(f"file://{tmp_path}")
         return
 
-    recipient = config.email_from if args.test_email else config.email_to
     if args.test_email:
-        print(f"Test mode: sending to {recipient}")
-
-    original_to = config.email_to
-    if args.test_email:
+        print(f"Test mode: sending to {config.email_from}")
         config.email_to = config.email_from
 
     send_report(html, config)
-    config.email_to = original_to
 
 
 if __name__ == "__main__":
