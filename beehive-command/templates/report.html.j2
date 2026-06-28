@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ apiary_name }} — Weekly Apiary Report</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f0e8;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#2c2c2c;">
+
+<!-- ─── HEADER BAND ─────────────────────────────────────────────────────── -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#5a3e1b;">
+  <tr>
+    <td style="padding:24px 32px;">
+      <div style="color:#f5d78e;font-size:22px;font-weight:bold;">🐝 {{ apiary_name }}</div>
+      <div style="color:#c9a96e;font-size:14px;margin-top:4px;">Weekly Apiary Report — {{ report_date }}</div>
+      <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+        <tr>
+          <td style="background:#7a5230;border-radius:6px;padding:10px 20px;color:#f5d78e;text-align:center;margin-right:12px;">
+            <div style="font-size:24px;font-weight:bold;">{{ active_hive_count }}</div>
+            <div style="font-size:11px;color:#c9a96e;">Active Hives</div>
+          </td>
+          <td width="12"></td>
+          <td style="background:#7a5230;border-radius:6px;padding:10px 20px;color:#f5d78e;text-align:center;">
+            <div style="font-size:24px;font-weight:bold;">{{ total_bee_frames }}</div>
+            <div style="font-size:11px;color:#c9a96e;">Total Bee Frames</div>
+          </td>
+          <td width="12"></td>
+          <td style="background:#7a5230;border-radius:6px;padding:10px 20px;color:#f5d78e;text-align:center;">
+            <div style="font-size:24px;font-weight:bold;">{{ alert_count }}</div>
+            <div style="font-size:11px;color:#c9a96e;">Alerts</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- ─── ALERTS PANEL ─────────────────────────────────────────────────────── -->
+{% set urgent = hive_states | selectattr('alerts') | list %}
+{% if urgent %}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8f0;border-top:4px solid #c0392b;">
+  <tr>
+    <td style="padding:20px 32px;">
+      <div style="font-size:16px;font-weight:bold;color:#c0392b;margin-bottom:12px;">⚠ Open First</div>
+      {% for h in urgent %}
+      <table cellpadding="0" cellspacing="0" style="margin-bottom:8px;width:100%;">
+        <tr>
+          <td style="background:{% if h.risk_score >= 60 %}#fde8e8{% else %}#fff3cd{% endif %};border-left:4px solid {% if h.risk_score >= 60 %}#c0392b{% else %}#e67e22{% endif %};border-radius:4px;padding:8px 14px;">
+            <strong>{{ h.hive_id }}</strong>
+            {% for alert in h.alerts %}
+            <span style="display:inline-block;background:{% if 'QUEENLESS' in alert or 'OVERDUE' in alert %}#c0392b{% else %}#e67e22{% endif %};color:#fff;border-radius:3px;padding:1px 7px;font-size:11px;margin-left:6px;">{{ alert }}</span>
+            {% endfor %}
+            {% if h.next_action %}
+            <span style="color:#555;font-size:12px;margin-left:10px;">→ {{ h.next_action }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+      {% endfor %}
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+<!-- ─── HIVE CARDS ────────────────────────────────────────────────────────── -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0e8;">
+  <tr>
+    <td style="padding:24px 32px;">
+      <div style="font-size:16px;font-weight:bold;color:#5a3e1b;margin-bottom:16px;">Hive Status</div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        {% for h in hive_states %}
+        {% set row_bg = '#fff8f0' if loop.index is odd else '#fff' %}
+        <tr>
+          <td style="background:{{ row_bg }};border-radius:6px;padding:12px 16px;margin-bottom:8px;border:1px solid #e8dfd0;vertical-align:top;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Hive ID + badges -->
+                <td width="160" style="vertical-align:top;">
+                  <div style="font-size:15px;font-weight:bold;color:#5a3e1b;">{{ h.hive_id }}</div>
+                  {% if h.unit_type %}<div style="font-size:11px;color:#888;">{{ h.unit_type }}</div>{% endif %}
+                  <!-- Strength badge -->
+                  <span style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:bold;
+                    background:{% if h.strength == 'Strong' %}#d4edda{% elif h.strength == 'Moderate' %}#fff3cd{% else %}#f8d7da{% endif %};
+                    color:{% if h.strength == 'Strong' %}#155724{% elif h.strength == 'Moderate' %}#856404{% else %}#721c24{% endif %};">
+                    {{ h.strength }}{% if h.bee_frames is not none %} ({{ h.bee_frames }}fr){% endif %}
+                  </span>
+                </td>
+                <!-- Queen status -->
+                <td width="150" style="vertical-align:top;padding-left:12px;">
+                  <div style="font-size:11px;color:#888;margin-bottom:3px;">Queen</div>
+                  <span style="font-size:12px;font-weight:bold;
+                    color:{% if h.queen_status == 'Queen Present' %}#155724{% elif h.queen_status == 'Queenless' %}#c0392b{% else %}#856404{% endif %};">
+                    {{ h.queen_status }}
+                  </span>
+                  {% if h.eggs == 'Yes' %}<div style="font-size:11px;color:#555;">Eggs ✓</div>{% endif %}
+                </td>
+                <!-- Inspection -->
+                <td width="130" style="vertical-align:top;padding-left:12px;">
+                  <div style="font-size:11px;color:#888;margin-bottom:3px;">Last Inspection</div>
+                  {% if h.days_since_inspection is not none %}
+                  <span style="font-size:12px;font-weight:bold;color:{% if h.days_since_inspection > 14 %}#c0392b{% elif h.days_since_inspection > 7 %}#e67e22{% else %}#155724{% endif %};">
+                    {{ h.days_since_inspection }}d ago
+                  </span>
+                  {% if h.last_inspection_date %}
+                  <div style="font-size:11px;color:#888;">{{ h.last_inspection_date.strftime('%b %d') }}</div>
+                  {% endif %}
+                  {% else %}
+                  <span style="font-size:12px;color:#888;">No data</span>
+                  {% endif %}
+                </td>
+                <!-- Mite pressure -->
+                <td width="130" style="vertical-align:top;padding-left:12px;">
+                  <div style="font-size:11px;color:#888;margin-bottom:3px;">Mite Pressure</div>
+                  <span style="font-size:12px;font-weight:bold;
+                    color:{% if h.mite_pressure == 'Low' %}#155724{% elif h.mite_pressure == 'Moderate' %}#856404{% elif h.mite_pressure == 'High' %}#c0392b{% elif h.mite_pressure == 'Critical' %}#721c24{% else %}#888{% endif %};">
+                    {{ h.mite_pressure }}
+                    {% if h.mite_rate is not none %} ({{ "%.1f"|format(h.mite_rate) }}%){% endif %}
+                  </span>
+                  {% if h.treatment_status %}
+                  <div style="font-size:11px;color:#555;">{{ h.treatment_status }}</div>
+                  {% endif %}
+                </td>
+                <!-- Next action -->
+                <td style="vertical-align:top;padding-left:12px;">
+                  <div style="font-size:11px;color:#888;margin-bottom:3px;">Next Action</div>
+                  <div style="font-size:12px;color:#2c2c2c;">{{ h.next_action or '—' }}</div>
+                  {% if h.food_stores %}
+                  <div style="font-size:11px;color:#888;margin-top:4px;">Food: {{ h.food_stores }}</div>
+                  {% endif %}
+                </td>
+                <!-- Risk score -->
+                <td width="60" style="vertical-align:top;padding-left:12px;text-align:center;">
+                  <div style="font-size:11px;color:#888;margin-bottom:3px;">Risk</div>
+                  <span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:50%;font-size:13px;font-weight:bold;text-align:center;
+                    background:{% if h.risk_score >= 60 %}#c0392b{% elif h.risk_score >= 30 %}#e67e22{% else %}#27ae60{% endif %};
+                    color:#fff;">{{ h.risk_score }}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td height="6"></td></tr>
+        {% endfor %}
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- ─── QUEEN REARING TIMELINE ───────────────────────────────────────────── -->
+{% if active_batches or active_mating_nucs %}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-top:2px solid #e8dfd0;">
+  <tr>
+    <td style="padding:24px 32px;">
+      <div style="font-size:16px;font-weight:bold;color:#5a3e1b;margin-bottom:14px;">Queen Rearing Timeline</div>
+      {% if active_batches %}
+      <div style="font-size:13px;font-weight:bold;color:#7a5230;margin-bottom:8px;">Active Nicot Batches</div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr style="background:#f5f0e8;">
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Batch ID</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Day 0</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Donor</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Builder</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;"># Cups</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Status</th>
+        </tr>
+        {% for b in active_batches %}
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;font-weight:bold;">{{ b.get('Batch ID', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ b.get('Day 0', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ b.get('Donor Hive', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ b.get('Builder Hive', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ b.get('# Cups', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ b.get('Status', '') }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if active_larvae %}
+      <div style="font-size:13px;font-weight:bold;color:#7a5230;margin-top:16px;margin-bottom:8px;">Larvae Transfer Calendar</div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr style="background:#f5f0e8;">
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Batch ID</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Transfer Date</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Cell Builder</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Next Critical</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Next Date</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Status</th>
+        </tr>
+        {% for r in active_larvae %}
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;font-weight:bold;">{{ r.get('Active Batch ID', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ r.get('Transfer Date', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ r.get('Cell Builder Unit', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ r.get('Next Critical', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ r.get('Next Date', '') }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ebe0;">{{ r.get('Batch Status', '') }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+<!-- ─── MITE PRESSURE SUMMARY ─────────────────────────────────────────────── -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0e8;border-top:2px solid #e8dfd0;">
+  <tr>
+    <td style="padding:24px 32px;">
+      <div style="font-size:16px;font-weight:bold;color:#5a3e1b;margin-bottom:14px;">Mite Pressure Summary</div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr style="background:#5a3e1b;">
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Hive</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Sample Date</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Mites/100</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Pressure</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Treatment</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#f5d78e;border-bottom:1px solid #7a5230;">Status</th>
+        </tr>
+        {% for h in hive_states %}
+        <tr style="background:{% if loop.index is odd %}#fff8f0{% else %}#fff{% endif %};">
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;font-weight:bold;">{{ h.hive_id }}</td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">
+            {% if h.mite_sample_date %}{{ h.mite_sample_date.strftime('%b %d, %Y') }}{% else %}—{% endif %}
+          </td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">
+            {% if h.mite_rate is not none %}{{ "%.1f"|format(h.mite_rate) }}{% else %}—{% endif %}
+          </td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">
+            <span style="font-weight:bold;
+              color:{% if h.mite_pressure == 'Low' %}#155724{% elif h.mite_pressure == 'Moderate' %}#856404{% elif h.mite_pressure == 'High' %}#c0392b{% elif h.mite_pressure == 'Critical' %}#721c24{% else %}#888{% endif %};">
+              {{ h.mite_pressure }}
+            </span>
+          </td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">{{ h.treatment_type or '—' }}</td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0ebe0;">{{ h.treatment_status or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- ─── SEASONAL RECOMMENDATIONS ─────────────────────────────────────────── -->
+{% if seasonal_advice %}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbf2;border-top:2px solid #e8dfd0;">
+  <tr>
+    <td style="padding:24px 32px;">
+      <div style="font-size:16px;font-weight:bold;color:#5a3e1b;margin-bottom:12px;">Seasonal Recommendations</div>
+      <ul style="margin:0;padding-left:20px;">
+        {% for tip in seasonal_advice %}
+        <li style="margin-bottom:6px;color:#2c2c2c;">{{ tip }}</li>
+        {% endfor %}
+      </ul>
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+<!-- ─── HONEY HARVEST YTD ──────────────────────────────────────────────────── -->
+{% if honey_rows %}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-top:2px solid #e8dfd0;">
+  <tr>
+    <td style="padding:24px 32px;">
+      <div style="font-size:16px;font-weight:bold;color:#5a3e1b;margin-bottom:14px;">Honey Harvest YTD</div>
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr style="background:#f5f0e8;">
+          <th style="text-align:left;padding:8px 16px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Hive</th>
+          <th style="text-align:right;padding:8px 16px;font-size:12px;color:#888;border-bottom:1px solid #e8dfd0;">Weight (lbs)</th>
+        </tr>
+        {% for row in honey_rows %}
+        <tr>
+          <td style="padding:7px 16px;border-bottom:1px solid #f0ebe0;font-weight:bold;">{{ row.hive_id }}</td>
+          <td style="padding:7px 16px;border-bottom:1px solid #f0ebe0;text-align:right;">{{ "%.1f"|format(row.honey_ytd_lbs) }}</td>
+        </tr>
+        {% endfor %}
+        <tr style="background:#f5f0e8;">
+          <td style="padding:8px 16px;font-weight:bold;">Total</td>
+          <td style="padding:8px 16px;font-weight:bold;text-align:right;">{{ "%.1f"|format(honey_total) }}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+<!-- ─── FOOTER ────────────────────────────────────────────────────────────── -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#5a3e1b;">
+  <tr>
+    <td style="padding:16px 32px;color:#c9a96e;font-size:11px;">
+      Generated {{ generated_at }} &nbsp;|&nbsp; Data: {{ excel_path }}
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
